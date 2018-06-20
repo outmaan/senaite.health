@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version = '1.1.1'
+version = '1.1.3'
 
 setup(
     name='senaite.health',
@@ -30,6 +30,12 @@ setup(
         'senaite.core',
         'archetypes.schemaextender',
     ],
+    extras_require={
+        'test': [
+            'unittest2',
+            'plone.app.testing',
+        ]
+    },
     entry_points="""
         # -*- Entry points: -*-
         [z3c.autoinclude.plugin]

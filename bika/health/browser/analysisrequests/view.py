@@ -5,25 +5,33 @@
 # Copyright 2018 by it's authors.
 # Some rights reserved. See LICENSE.rst, CONTRIBUTORS.rst.
 
+from bika.lims import api
 from bika.lims.browser.analysisrequest import AnalysisRequestsView as BaseView
 from bika.health import bikaMessageFactory as _
 from Products.CMFCore.utils import getToolByName
 from bika.health.catalog import CATALOG_PATIENT_LISTING
+from bika.lims.utils import get_link
+from plone.memoize import view as viewcache
 
 
 class AnalysisRequestsView(BaseView):
     def __init__(self, context, request):
         super(AnalysisRequestsView, self).__init__(context, request)
-        self.patient_catalog = None
         self.columns['BatchID']['title'] = _('Case ID')
         # Add Client Patient fields
         self.columns['getPatientID'] = {
-            'title': _('Patient ID'), }
+            'title': _('Patient ID'),
+        }
         self.columns['getClientPatientID'] = {
             'title': _("Client PID"),
-            'sortable': False, }
-        self.columns['getPatient'] = {
-            'title': _('Patient'), }
+            'sortable': False,
+        }
+        self.columns['getPatientTitle'] = {
+            'title': _('Patient'),
+        }
+        self.columns['getDoctorTitle'] = {
+            'title': _('Doctor'),
+        }
 
     def folderitems(self, full_objects=False):
         pm = getToolByName(self.context, "portal_membership")
@@ -34,34 +42,45 @@ class AnalysisRequestsView(BaseView):
         if 'Manager' not in roles \
             and 'LabManager' not in roles \
                 and 'LabClerk' not in roles:
-            del self.columns['getPatientID']
-            del self.columns['getClientPatientID']
-            del self.columns['getPatient']
+            self.remove_column('getPatientID')
+            self.remove_column('getClientPatientID')
+            self.remove_column('getPatientTitle')
+            self.remove_column('getDoctorTitle')
         # Otherwise show the columns in the list
         else:
             for rs in self.review_states:
                 i = rs['columns'].index('BatchID') + 1
                 rs['columns'].insert(i, 'getClientPatientID')
                 rs['columns'].insert(i, 'getPatientID')
-                rs['columns'].insert(i, 'getPatient')
-        # Setting ip the patient catalog to be used in folderitem()
-        self.patient_catalog = getToolByName(
-            self.context, CATALOG_PATIENT_LISTING)
+                rs['columns'].insert(i, 'getPatientTitle')
+                rs['columns'].insert(i, 'getDoctorTitle')
         return super(AnalysisRequestsView, self).folderitems(
             full_objects=False, classic=False)
+
+    @viewcache.memoize
+    def get_brain(self, uid, catalog):
+        if not api.is_uid(uid):
+            return None
+        query = dict(UID=uid)
+        brains = api.search(query, catalog)
+        if brains and len(brains) == 1:
+            return brains[0]
+        return None
 
     def folderitem(self, obj, item, index):
         item = super(AnalysisRequestsView, self)\
             .folderitem(obj, item, index)
-        patient = self.patient_catalog(UID=obj.getPatientUID)
-        if patient:
-            item['getPatientID'] = patient[0].getId
-            item['replace']['getPatientID'] = "<a href='%s'>%s</a>" % \
-                (patient[0].getURL(), patient[0].getId)
-            item['getClientPatientID'] = patient[0].getClientPatientID
-            item['replace']['getClientPatientID'] = "<a href='%s'>%s</a>" % \
-                (patient[0].getURL(), patient[0].getClientPatientID)
-            item['getPatient'] = patient[0].Title
-            item['replace']['getPatient'] = "<a href='%s'>%s</a>" % \
-                (patient[0].getURL(), patient[0].Title)
+
+        item['getPatientID'] = obj.getPatientID
+        item['getPatientTitle'] = obj.getPatientTitle
+        item['getClientPatientID'] = obj.getClientPatientID
+        url = '{}/analysisrequests'.format(obj.getPatientURL)
+        item['replace']['getPatientTitle'] = get_link(url, obj.getPatientTitle)
+        item['replace']['getPatientID'] = get_link(url, obj.getPatientID)
+        item['replace']['getClientPatientID'] = get_link(url, obj.getClientPatientID)
+
+        item['getDoctorTitle'] = obj.getDoctorTitle
+        if obj.getDoctorURL:
+            url = '{}/analysisrequests'.format(obj.getDoctorURL)
+            item['replace']['getDoctorTitle'] = get_link(url, obj.getDoctorTitle)
         return item

@@ -11,7 +11,6 @@ from Products.Archetypes.references import HoldingReference
 from Products.CMFCore import permissions
 from archetypes.schemaextender.interfaces import IOrderableSchemaExtender
 from archetypes.schemaextender.interfaces import ISchemaModifier
-from plone.indexer.decorator import indexer
 from zope.component import adapts
 from zope.interface import implements
 
@@ -23,53 +22,6 @@ from bika.lims.fields import BooleanWidget
 from bika.lims.fields import ExtReferenceField
 from bika.lims.fields import ExtStringField
 from bika.lims.interfaces import IAnalysisRequest
-from bika.lims.interfaces import IBikaCatalog
-from bika.lims.interfaces import IBikaCatalogAnalysisRequestListing
-
-
-# Defining the indexes for this extension. Since this is an extension, no
-# getter is created so we need to create indexes in that way.
-# TODO-catalog: delete this index
-@indexer(IAnalysisRequest, IBikaCatalog)
-def getPatientUID(instance):
-    field = instance.getField('Patient', '')
-    item = field.get(instance) if field else None
-    value = item and item.UID() or ''
-    return value
-
-
-@indexer(IAnalysisRequest, IBikaCatalogAnalysisRequestListing)
-def getPatientUID(instance):
-    field = instance.getField('Patient', '')
-    item = field.get(instance) if field else None
-    value = item and item.UID() or ''
-    return value
-
-
-@indexer(IAnalysisRequest, IBikaCatalogAnalysisRequestListing)
-def getDoctorUID(instance):
-    field = instance.getField('Doctor', '')
-    item = field.get(instance) if field else None
-    value = item and item.UID() or ''
-    return value
-
-
-# We use this index to sort columns and filter lists
-@indexer(IAnalysisRequest, IBikaCatalogAnalysisRequestListing)
-def getPatient(instance):
-    field = instance.getField('Patient', '')
-    item = field.get(instance) if field else None
-    value = item and item.Title() or ''
-    return value
-
-
-# We use this index to sort columns and filter lists
-@indexer(IAnalysisRequest, IBikaCatalogAnalysisRequestListing)
-def getPatientID(instance):
-    field = instance.getField('Patient', '')
-    item = field.get(instance) if field else None
-    value = item and item.getId() or ''
-    return value
 
 
 class AnalysisRequestSchemaExtender(object):
@@ -122,6 +74,7 @@ class AnalysisRequestSchemaExtender(object):
                          'add': 'edit',
                          'secondary': 'disabled'},
                 catalog_name='bikahealth_catalog_patient_listing',
+                search_fields=('SearchableText',),
                 base_query={'inactive_state': 'active'},
                 colModel = [
                     {'columnName': 'Title', 'width': '30', 'label': _(
@@ -129,7 +82,9 @@ class AnalysisRequestSchemaExtender(object):
                     # UID is required in colModel
                     {'columnName': 'UID', 'hidden': True},
                 ],
-                showOn=True,
+                showOn=False,
+                delay=1000,
+                minLength=2,
                 add_button={
                     'visible': True,
                     'url': 'patients/portal_factory/Patient/new/edit',
@@ -177,7 +132,7 @@ class AnalysisRequestSchemaExtender(object):
                 ui_item='getClientPatientID',
                 search_query='',
                 discard_empty=('ClientPatientID',),
-                search_fields=('ClientPatientID',),
+                search_fields=('getClientPatientID',),
                 portal_types=('Patient',),
                 render_own_label=True,
                 visible={'edit': 'visible',
